@@ -1,0 +1,165 @@
+// Prisma schema for NaysIn (PostgreSQL)
+// Respecting PRD v1.1 Data Integrity & Auditing rules
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  OWNER
+  STAFF
+}
+
+enum TransactionType {
+  IN
+  OUT
+  ADJUSTMENT
+  WASTE
+}
+
+enum WasteReason {
+  EXPIRED
+  DAMAGED
+  SPOILED
+  OTHER
+}
+
+model User {
+  id           String             @id @default(uuid())
+  name         String
+  email        String             @unique
+  passwordHash String
+  role         Role               @default(STAFF)
+  isActive     Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  transactions StockTransaction[]
+}
+
+model Ingredient {
+  id           String             @id @default(uuid())
+  name         String             @unique
+  unit         String             // e.g. "gram", "ml", "pcs", "sachet"
+  currentStock Float              @default(0)
+  minimumStock Float              @default(0)
+  isActive     Boolean            @default(true)
+  notes        String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  batches      IngredientBatch[]
+  transactions StockTransaction[]
+  menuItems    MenuIngredient[]
+
+  @@index([isActive])
+}
+
+model IngredientBatch {
+  id                String             @id @default(uuid())
+  ingredientId      String
+  lotCode           String?
+  quantityRemaining Float
+  receivedAt        DateTime           @default(now())
+  expiresAt         DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  ingredient        Ingredient         @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  transactions      StockTransaction[]
+
+  @@index([ingredientId])
+  @@index([expiresAt])
+}
+
+model StockTransaction {
+  id              String          @id @default(uuid())
+  ingredientId    String
+  batchId         String?
+  userId          String
+  type            TransactionType
+  quantity        Float           // positive magnitude
+  beforeQty       Float
+  afterQty        Float
+  note            String?
+  wasteReason     WasteReason?
+  idempotencyKey  String?         @unique
+  createdAt       DateTime        @default(now())
+
+  ingredient      Ingredient       @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  batch           IngredientBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([ingredientId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([type])
+}
+
+model Menu {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  category    String           // e.g. "Kopi", "Non-Kopi", "Camilan"
+  description String
+  price       Int?             // verified price or null if unconfirmed
+  isAvailable Boolean          @default(true)
+  notes       String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  aliases     MenuAlias[]
+  ingredients MenuIngredient[]
+
+  @@index([isAvailable])
+  @@index([category])
+}
+
+model MenuAlias {
+  id        String   @id @default(uuid())
+  menuId    String
+  alias     String   @unique // normalized lowercase
+  createdAt DateTime @default(now())
+
+  menu      Menu     @relation(fields: [menuId], references: [id], onDelete: Cascade)
+
+  @@index([menuId])
+}
+
+model MenuIngredient {
+  id           String     @id @default(uuid())
+  menuId       String
+  ingredientId String
+  quantity     Float?
+  unit         String?
+
+  menu         Menu       @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+  @@unique([menuId, ingredientId])
+}
+
+model ChatLog {
+  id                String   @id @default(uuid())
+  channel           String   // "WEB" or "WHATSAPP"
+  externalMessageId String?  @unique
+  question          String
+  answer            String
+  status            String   // "SUCCESS", "FALLBACK", "ERROR"
+  modelVersion      String?
+  createdAt         DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([channel])
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

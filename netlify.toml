@@ -1,0 +1,11 @@
+[build]
+  command = "npm run build"
+
+# Note for Netlify Next.js Runtime:
+# Netlify automatically detects Next.js App Router and provisions the OpenNext-based Next.js Runtime.
+# DO NOT set publish = "dist", "out", or "public" for server-rendered Next.js.
+# DO NOT add a SPA fallback catch-all (e.g. /* /index.html 200) as this hijacks SSR and API route handlers.
+
+[build.environment]
+  NODE_VERSION = "20"
+
