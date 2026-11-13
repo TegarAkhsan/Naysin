@@ -119,3 +119,4 @@ describe("AI Menu Assistant Accuracy Evaluation Benchmark (>=90% Target)", () =>
     expect(accuracy).toBeGreaterThanOrEqual(90);
   });
 });
+
